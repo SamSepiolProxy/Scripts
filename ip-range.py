@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+#example python3 ip-range.py 192.168.0.0 192.168.0.255
 import sys
 
 def undotIPv4 (dotted):
