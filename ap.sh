@@ -63,7 +63,7 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 
 func_kill_conflicts() {
 #stops NetworkManage conflict
-sudo nmcli device set ifname wlan0 managed no
+sudo nmcli device set ifname $accesspoint managed no
 #stops airmon conflict
 sudo airmon-ng stop ${accesspoint}mon
 #Mainly for Ubuntu stops systemd-resolved as it conflicts with dnsmasq
