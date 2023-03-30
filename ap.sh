@@ -56,6 +56,10 @@ EOF
 func_ip_setup() {
 ip a a 192.168.30.1/24 dev wlan0
 route add -net 192.168.30.0 netmask 255.255.255.0 gw 192.168.30.1
+iptables --flush
+iptables --table nat --flush
+iptables --delete-chain
+iptables --table nat --delete-chain
 iptables --table nat --append POSTROUTING --out-interface $uplink -j MASQUERADE
 iptables --append FORWARD --in-interface $accesspoint -j ACCEPT
 echo 1 > /proc/sys/net/ipv4/ip_forward
