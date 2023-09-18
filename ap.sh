@@ -5,11 +5,11 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-echo -n "Enter the AP device name [ENTER]: "
+echo -n "Enter the AP interface [ENTER]: "
 read accesspoint
 echo
 
-echo -n "Enter the uplink device name [ENTER]: "
+echo -n "Enter the uplink interface [ENTER]: "
 read uplink
 echo
 
