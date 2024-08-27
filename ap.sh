@@ -54,7 +54,7 @@ EOF
 }
 
 func_ip_setup() {
-ip a a 192.168.30.1/24 dev wlan0
+ip a a 192.168.30.1/24 dev $accesspoint
 route add -net 192.168.30.0 netmask 255.255.255.0 gw 192.168.30.1
 iptables --flush
 iptables --table nat --flush
