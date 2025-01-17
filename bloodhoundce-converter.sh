@@ -27,7 +27,7 @@ echo "cp customqueries.json ~/.config/bloodhound/"
 # Fetch existing saved queries
 echo "[*] Fetching existing saved queries from API..."
 API_URL="http://localhost:8080/api/v2/saved-queries"
-JWT_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzcxNDIyNDUsImp0aSI6IjEwIiwiaWF0IjoxNzM3MTEzNDQ1LCJzdWIiOiI0YzMxZWZmYy1lMGVjLTRiZTAtOGM3NC05YWI3YTBkYzIzMWEifQ.14lHSiMl0JhLOZYMrtiF4C-kQXs75IVUG_svlZxvX5Q"
+JWT_TOKEN="Session Token Here"
 
 curl -X GET \
   "$API_URL" \
