@@ -21,9 +21,6 @@ curl -s -o "$TMPDIR/customqueries-ZephrFish-bloodhound-queries.json" "https://ra
 echo "[*] Merging queries..."
 cat "$TMPDIR/"*-bloodhound-queries.json | jq -s 'add + {queries: map(.queries[] | {name: .name, description: .description, query: (.queryList[0].query // empty)})}' > customqueries.json
 
-echo "[*] Done. Please copy to your config directory:"
-echo "cp customqueries.json ~/.config/bloodhound/"
-
 # Fetch existing saved queries
 echo "[*] Fetching existing saved queries from API..."
 API_URL="http://localhost:8080/api/v2/saved-queries"
