@@ -14,7 +14,7 @@ The repository includes scripts written in multiple languages, such as PowerShel
   - `PortScan-Top128.ps1`: Scans the top 128 commonly used ports.
   - `SmartScreenConfigCheck.ps1`: Checks SmartScreen configurations.
   - `sendmail.ps1`: Automates the process of sending emails to a list of recipients. This was developed for direct-send via the Azure CLI.
-  - `Azure-Admin-Unit-Dump.ps1`: Automates the dumping of Azure Admin Units including members and assigned roles. If no UPN appears in the role dump it's possible the role is assigned to a service principal.
+  - `Get-AdminUnitsAndRoles.ps1`: Automates the dumping of Azure Admin Units including members and assigned roles. If no UPN appears in the role dump it's possible the role is assigned to a service principal.
 
 - **Python Scripts**:
   - `iker.py`: A Python script for network-related tasks.
