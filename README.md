@@ -24,7 +24,8 @@ The repository includes scripts written in multiple languages, such as PowerShel
 
 - **Shell Scripts**:
   - `ap.sh`: Sets up an access point using specified interfaces.
-  - `bloodhound-merger.sh`: Merges custom BloodHound queries from various sources.
+  - `bloodhound-merger.sh`: Merges custom BloodHound queries from various sources. (Old BloodHound)
+  - `bloodhoundce-converter.sh`: Merges custom BloodHound queries from various sources and converts them to the new format. Then deletes the old queries and uploads the new list via the API. Known issue: If query lists are used only the top one is converted/kept.
   - `kubernetesreview.sh`: Performs a review of Kubernetes configurations.
   - `makecert.sh`: Generates SSL/TLS certificates.
   - `portscanlinux.sh`: Conducts a port scan on a Linux system.
