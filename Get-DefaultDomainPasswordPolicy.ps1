@@ -1,4 +1,4 @@
-# Function to get the default domain password policy
+# Function to get the default domain password policy including reversible encryption
 function Get-DefaultPasswordPolicy {
     try {
         # Get the domain context
@@ -9,7 +9,8 @@ function Get-DefaultPasswordPolicy {
         $searcher.Filter = "(objectClass=domain)"
 
         # Add properties to retrieve
-        $properties = @("minPwdLength", "maxPwdAge", "pwdHistoryLength", "pwdProperties", "lockoutDuration", "lockoutThreshold")
+        $properties = @("minPwdLength", "maxPwdAge", "pwdHistoryLength", "pwdProperties", 
+                        "lockoutDuration", "lockoutThreshold", "ms-DS-Password-Reversible-Encryption-Enabled")
         foreach ($prop in $properties) {
             $searcher.PropertiesToLoad.Add($prop) | Out-Null
         }
@@ -28,13 +29,27 @@ function Get-DefaultPasswordPolicy {
             $lockoutDuration = if ($domain["lockoutDuration"].Count -gt 0) { [timespan]::FromTicks([int64]$domain["lockoutDuration"][0]) } else { $null }
             $lockoutDurationMinutes = if ($lockoutDuration -ne $null) { -$lockoutDuration.TotalMinutes } else { "Not Set" }
 
+            # Get password properties
+            $pwdProperties = if ($domain["pwdProperties"].Count -gt 0) { $domain["pwdProperties"][0] -as [int] } else { 0 }
+
+            # Password Complexity (Bit 0 - Value 1)
+            $passwordComplexityEnabled = if (($pwdProperties -band 1) -eq 1) { "Enabled" } else { "Disabled" }
+
+            # Store Passwords Using Reversible Encryption (ms-DS-Password-Reversible-Encryption-Enabled)
+            $reversibleEncryption = if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"].Count -gt 0) {
+                if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"][0] -eq "TRUE") { "Enabled" } else { "Disabled" }
+            } else {
+                "Not Set"
+            }
+
             # Display results
             Write-Host "Default Domain Password Policy:"
             Write-Host "----------------------------------"
             Write-Host "Minimum Password Length: " ($domain["minPwdLength"][0] -as [int])
             Write-Host "Maximum Password Age (Days): " $maxPwdAgeDays
             Write-Host "Password History Length: " ($domain["pwdHistoryLength"][0] -as [int])
-            Write-Host "Password Properties: " ($domain["pwdProperties"][0] -as [int])
+            Write-Host "Password Complexity: " $passwordComplexityEnabled
+            Write-Host "Store Passwords Using Reversible Encryption: " $reversibleEncryption
             Write-Host "Account Lockout Duration (Minutes): " $lockoutDurationMinutes
             Write-Host "Account Lockout Threshold: " ($domain["lockoutThreshold"][0] -as [int])
         } else {
