@@ -11,20 +11,31 @@ function Get-LocalPasswordPolicy {
     $output += "Local Password Policy Settings:"
     $output += "==============================="
 
-    # Export security policy settings to a temporary file
-    $TempFile = "$env:TEMP\secpol.cfg"
-    secedit /export /areas SECURITYPOLICY /cfg $TempFile > $null
+    # Determine if running as Administrator
+    $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
-    if (Test-Path $TempFile) {
-        $PolicyContent = Get-Content $TempFile | Where-Object {
-            $_ -match "^(MinimumPasswordAge|MaximumPasswordAge|MinimumPasswordLength|PasswordComplexity|PasswordHistorySize|LockoutBadCount|ResetLockoutCount|LockoutDuration|AllowAdministratorLockout|ClearTextPassword)"
+    if ($isAdmin) {
+        $output += "Running with administrative privileges. Using secedit to retrieve local password policy."
+        # Export security policy settings to a temporary file using secedit
+        $TempFile = "$env:TEMP\secpol.cfg"
+        secedit /export /areas SECURITYPOLICY /cfg $TempFile > $null
+
+        if (Test-Path $TempFile) {
+            $PolicyContent = Get-Content $TempFile | Where-Object {
+                $_ -match "^(MinimumPasswordAge|MaximumPasswordAge|MinimumPasswordLength|PasswordComplexity|PasswordHistorySize|LockoutBadCount|ResetLockoutCount|LockoutDuration|AllowAdministratorLockout|ClearTextPassword)"
+            }
+            $output += $PolicyContent
+            Remove-Item $TempFile -Force
         }
-        $output += $PolicyContent
-        Remove-Item $TempFile -Force
-        $output += "Local password policy settings displayed above."
+        else {
+            $output += "Failed to export security policy settings."
+        }
     }
     else {
-        $output += "Failed to export security policy settings."
+        $output += "Not running with administrative privileges. Using 'net accounts' to retrieve local password policy."
+        # Use net accounts command as fallback
+        $netAccountsOutput = net accounts 2>&1
+        $output += $netAccountsOutput
     }
     return $output
 }
@@ -35,7 +46,7 @@ function Get-LocalPasswordPolicy {
 function Get-DomainPasswordPolicy {
     $output = @()
     try {
-        # Retrieve the default naming context
+        # Retrieve the default naming context from Active Directory
         $rootDSE = [ADSI]"LDAP://RootDSE"
         $defaultNamingContext = $rootDSE.defaultNamingContext
         $searcher = New-Object DirectoryServices.DirectorySearcher
@@ -65,7 +76,7 @@ function Get-DomainPasswordPolicy {
             $pwdProperties = if ($domain["pwdProperties"].Count -gt 0) { $domain["pwdProperties"][0] -as [int] } else { 0 }
             $passwordComplexityEnabled = if (($pwdProperties -band 1) -eq 1) { "Enabled" } else { "Disabled" }
             
-            # Check for reversible encryption
+            # Check for reversible encryption setting
             $reversibleEncryption = if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"].Count -gt 0) {
                 if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"][0] -eq "TRUE") { "Enabled" } else { "Disabled" }
             } else {
@@ -144,7 +155,7 @@ function Get-FineGrainedPasswordPolicy {
             else {
                 $output += "PSO Applies To: Not Set"
             }
-            # Add a blank line between policies
+            # Blank line for separation
             $output += ""
         }
     }
@@ -155,7 +166,7 @@ function Get-FineGrainedPasswordPolicy {
 }
 
 # -------------------------------
-# Main Script: Call the functions and combine their output
+# Main Script: Combine outputs from all functions
 # -------------------------------
 $combinedOutput = @()
 
