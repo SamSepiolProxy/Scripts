@@ -1,4 +1,4 @@
-﻿param (
+param (
     [string]$OutputFile = "CombinedPasswordPolicy.txt"
 )
 
@@ -11,12 +11,12 @@ function Get-LocalPasswordPolicy {
     $output += "Local Password Policy Settings:"
     $output += "==============================="
 
-    # Determine if running as Administrator
+    # Check if running with administrative privileges
     $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
     if ($isAdmin) {
         $output += "Running with administrative privileges. Using secedit to retrieve local password policy."
-        # Export security policy settings to a temporary file using secedit
+        # Export local security policy settings to a temporary file
         $TempFile = "$env:TEMP\secpol.cfg"
         secedit /export /areas SECURITYPOLICY /cfg $TempFile > $null
 
@@ -33,7 +33,6 @@ function Get-LocalPasswordPolicy {
     }
     else {
         $output += "Not running with administrative privileges. Using 'net accounts' to retrieve local password policy."
-        # Use net accounts command as fallback
         $netAccountsOutput = net accounts 2>&1
         $output += $netAccountsOutput
     }
@@ -41,48 +40,64 @@ function Get-LocalPasswordPolicy {
 }
 
 # -------------------------------
-# Function: Get-DomainPasswordPolicy
+# Function: Get-DefaultPasswordPolicy
 # -------------------------------
-function Get-DomainPasswordPolicy {
+function Get-DefaultPasswordPolicy {
     $output = @()
     try {
-        # Retrieve the default naming context from Active Directory
+        # Get the domain context
         $rootDSE = [ADSI]"LDAP://RootDSE"
         $defaultNamingContext = $rootDSE.defaultNamingContext
         $searcher = New-Object DirectoryServices.DirectorySearcher
         $searcher.SearchRoot = [ADSI]("LDAP://" + $defaultNamingContext)
         $searcher.Filter = "(objectClass=domain)"
 
-        # Specify properties to retrieve
-        $properties = @("minPwdLength", "maxPwdAge", "pwdHistoryLength", "pwdProperties", 
-                        "lockoutDuration", "lockoutThreshold", "ms-DS-Password-Reversible-Encryption-Enabled")
+        # Add properties to retrieve (including lockoutObservationWindow)
+        $properties = @(
+            "minPwdLength", 
+            "maxPwdAge", 
+            "pwdHistoryLength", 
+            "pwdProperties", 
+            "lockoutDuration", 
+            "lockoutThreshold", 
+            "ms-DS-Password-Reversible-Encryption-Enabled",
+            "lockoutObservationWindow"
+        )
         foreach ($prop in $properties) {
             $searcher.PropertiesToLoad.Add($prop) | Out-Null
         }
 
+        # Execute search
         $result = $searcher.FindOne()
+
         if ($result -ne $null) {
             $domain = $result.Properties
 
-            # Convert maxPwdAge to days (stored as negative ticks)
+            # Convert maxPwdAge to days (stored in 100-nanosecond intervals)
             $maxPwdAge = if ($domain["maxPwdAge"].Count -gt 0) { [timespan]::FromTicks([int64]$domain["maxPwdAge"][0]) } else { $null }
             $maxPwdAgeDays = if ($maxPwdAge -ne $null) { -$maxPwdAge.Days } else { "Not Set" }
 
             # Convert lockoutDuration to minutes
             $lockoutDuration = if ($domain["lockoutDuration"].Count -gt 0) { [timespan]::FromTicks([int64]$domain["lockoutDuration"][0]) } else { $null }
             $lockoutDurationMinutes = if ($lockoutDuration -ne $null) { -$lockoutDuration.TotalMinutes } else { "Not Set" }
-            
-            # Determine password complexity from pwdProperties (bit 0)
+
+            # Convert lockoutObservationWindow to minutes
+            $lockoutObservationWindow = if ($domain["lockoutObservationWindow"].Count -gt 0) { [timespan]::FromTicks([int64]$domain["lockoutObservationWindow"][0]) } else { $null }
+            $lockoutObservationWindowMinutes = if ($lockoutObservationWindow -ne $null) { -$lockoutObservationWindow.TotalMinutes } else { "Not Set" }
+
+            # Get password properties
             $pwdProperties = if ($domain["pwdProperties"].Count -gt 0) { $domain["pwdProperties"][0] -as [int] } else { 0 }
+
+            # Determine password complexity (Bit 0)
             $passwordComplexityEnabled = if (($pwdProperties -band 1) -eq 1) { "Enabled" } else { "Disabled" }
-            
-            # Check for reversible encryption setting
+
+            # Determine reversible encryption setting
             $reversibleEncryption = if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"].Count -gt 0) {
                 if ($domain["ms-DS-Password-Reversible-Encryption-Enabled"][0] -eq "TRUE") { "Enabled" } else { "Disabled" }
             } else {
                 "Not Set"
             }
-            
+
             $output += "----------------------------------"
             $output += "Default Domain Password Policy:"
             $output += "----------------------------------"
@@ -92,10 +107,11 @@ function Get-DomainPasswordPolicy {
             $output += ("Password Complexity: " + $passwordComplexityEnabled)
             $output += ("Store Passwords Using Reversible Encryption: " + $reversibleEncryption)
             $output += ("Account Lockout Duration (Minutes): " + $lockoutDurationMinutes)
+            $output += ("Account Lockout Observation Window (Minutes): " + $lockoutObservationWindowMinutes)
             $output += ("Account Lockout Threshold: " + ($domain["lockoutThreshold"][0] -as [int]))
         }
         else {
-            $output += "Could not retrieve default domain password policy."
+            $output += "Could not retrieve password policy."
         }
     }
     catch {
@@ -155,7 +171,6 @@ function Get-FineGrainedPasswordPolicy {
             else {
                 $output += "PSO Applies To: Not Set"
             }
-            # Blank line for separation
             $output += ""
         }
     }
@@ -169,10 +184,9 @@ function Get-FineGrainedPasswordPolicy {
 # Main Script: Combine outputs from all functions
 # -------------------------------
 $combinedOutput = @()
-
 $combinedOutput += Get-LocalPasswordPolicy
 $combinedOutput += ""  # blank line separator
-$combinedOutput += Get-DomainPasswordPolicy
+$combinedOutput += Get-DefaultPasswordPolicy
 $combinedOutput += ""  # blank line separator
 $combinedOutput += Get-FineGrainedPasswordPolicy
 
