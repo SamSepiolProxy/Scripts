@@ -4,8 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-rm ./existing_queries.json
-rm ./customqueries.json
+rm -f ./existing_queries.json
+rm -f ./customqueries.json
 
 echo "[*] Creating temporary directory..."
 TMPDIR="$(mktemp -d --suffix=_bloodhound-customqueries)"
