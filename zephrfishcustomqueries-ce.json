@@ -749,6 +749,11 @@
       "name": "Search for key words in users title such as scientist or Executive - tweak as required",
       "description": null,
       "query": "MATCH p = (d:Domain)-[r:Contains*1..]->(u:User) WHERE u.title =~ '(?i).*scientist*' AND u.enabled = true RETURN p"
+    },
+    {
+      "name": "Search for key words in users name - tweak as required",
+      "description": null,
+      "query": "MATCH (u:User) WHERE u.name CONTAINS 'SQL' return u"
     }
   ]
 }
