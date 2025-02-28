@@ -7,9 +7,9 @@ param (
 # -------------------------------
 function Get-LocalPasswordPolicy {
     $output = @()
-    $output += "==============================="
+    $output += "----------------------------------"
     $output += "Local Password Policy Settings:"
-    $output += "==============================="
+    $output += "----------------------------------"
 
     # Check if running with administrative privileges
     $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
