@@ -1,3 +1,22 @@
+<#
+.SYNOPSIS
+    Continuously sets the LocalAccountTokenFilterPolicy registry value to 1 every 5 seconds.
+.DESCRIPTION
+    This script ensures that the LocalAccountTokenFilterPolicy remains enabled (set to 1).
+    It modifies the registry key:
+        HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
+    The script runs in a loop every 5 seconds and automatically corrects the value if changed.
+    It listens for Ctrl+C (CancelKeyPress) to allow safe termination of the script.
+.NOTES
+    - Requires Administrator privileges.
+    - Press Ctrl+C to stop the script gracefully.
+    - Useful in environments where this policy keeps getting reset.
+.AUTHOR
+    Your Name (Optional)
+.VERSION
+    1.0
+#>
+
 $stopFlag = $false
 
 # Function to handle Ctrl+C to stop the script
