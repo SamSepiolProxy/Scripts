@@ -11,9 +11,8 @@ function Get-GraphTokens {
     )
     <#
         .SYNOPSIS
-        Get-GraphTokens is the main user authentication module for GraphRunner.
+        Get-GraphTokens is a user authentication script.
         Upon authenticating it will store your tokens in the global $tokens variable and the tenant ID in $tenantid.
-        To use them with other GraphRunner modules, pass the tokens via the Tokens flag (Example: Invoke-DumpApps -Tokens $tokens)
 
         .DESCRIPTION
         This function initiates a device code flow that lets you authenticate via a browser session.
