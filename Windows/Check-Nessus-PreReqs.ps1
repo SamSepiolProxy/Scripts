@@ -73,6 +73,7 @@ if ($adminShares) {
 $smbPort = Get-NetTCPConnection -LocalPort 445 -ErrorAction SilentlyContinue
 if ($smbPort) {
     Write-Host "SMB port (TCP 445) is open and listening." -ForegroundColor Green
+    Write-Host "Use Nessus and NMAP to confirm access." -ForegroundColor Green
 } else {
     Write-Host "SMB port (TCP 445) is BLOCKED. Check firewall or enable File Sharing." -ForegroundColor Red
 }
@@ -81,6 +82,7 @@ if ($smbPort) {
 $wmiPort = Get-NetTCPConnection -LocalPort 135 -ErrorAction SilentlyContinue
 if ($wmiPort) {
     Write-Host "WMI RPC port (TCP 135) is open and listening." -ForegroundColor Green
+    Write-Host "Use Nessus and NMAP to confirm access." -ForegroundColor Green
 } else {
     Write-Host "WMI RPC port (TCP 135) is BLOCKED. Check firewall rules for WMI/DCOM." -ForegroundColor Red
 }
