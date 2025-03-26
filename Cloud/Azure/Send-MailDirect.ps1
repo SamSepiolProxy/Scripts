@@ -12,7 +12,7 @@ $SmtpServer = "test-co-uk.mail.protection.outlook.com"
 $EmailAddresses = Get-Content -Path $EmailListFile
 
 # Repeat the whole process 50 times
-for ($i = 1; $i -le 50; $i++) {
+for ($i = 1; $i -le 5; $i++) {
     Write-Host "Iteration $i"
     
     # Loop through each email address and send the email
