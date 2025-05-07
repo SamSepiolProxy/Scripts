@@ -7,7 +7,7 @@ function Get-SmartScreenStatus {
         @{
             "Registry Entry" = "HKLM:Software\Policies\Microsoft\Edge\SmartScreenEnabled"
             "Path" = "HKLM:\Software\Policies\Microsoft\Edge"
-            "Name" = "SmartScreenEnabled"
+            "Name" = "EdgeSmartScreenEnabled"
         },
         @{
             "Registry Entry" = "HKLM:Software\Policies\Microsoft\Windows\System\EnableSmartScreen"
@@ -44,10 +44,10 @@ function Get-SmartScreenStatus {
             
             # Interpret the value
             $interpretedValue = switch ($entry.Name) {
-                "SmartScreenEnabled" {
+                "EdgeSmartScreenEnabled" {
                     switch ($value) {
-                        1 { "SmartScreen is enabled" }
-                        0 { "SmartScreen is disabled" }
+                        1 { "EdgeSmartScreenEnabled is enabled" }
+                        0 { "EdgeSmartScreenEnabled is disabled" }
                         default { "Not configured" }
                     }
                 }
