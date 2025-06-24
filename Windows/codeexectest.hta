@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Greetings</title>
+  <hta:application
+    id="codeexectest"
+    applicationname="codeexectest"
+    border="thin"
+    caption="yes"
+    sysmenu="yes"
+    scroll="no"
+    singleinstance="yes"
+  />
+  <script language="JScript">
+    window.onload = function() {
+      try {
+        // Create a WScript.Shell object and show a native popup
+        var shell = new ActiveXObject("WScript.Shell");
+        // Popup(text, timeoutSeconds, title, typeFlags)
+        // typeFlags 0x40 = MB_ICONINFORMATION
+        shell.Popup("codeexectest", 0, "codeexectest", 0x40);
+      } catch (e) {
+        // Fallback to HTML alert if ActiveX isn't allowed
+        alert("codeexectest");
+      }
+      // Close the HTA window
+      window.close();
+    };
+  </script>
+</head>
+<body>
+  <!-- No visible content needed -->
+</body>
+</html>
