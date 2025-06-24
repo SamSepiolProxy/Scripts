@@ -1,34 +1,37 @@
+<!-- Mark-of-the-Web: saved from url=(0014)about:internet -->
 <!DOCTYPE html>
 <html>
 <head>
   <title>Greetings</title>
+
+  <!-- Force the MSHTML engine into its latest mode -->
+  <meta http-equiv="x-ua-compatible" content="IE=Edge" />
+
   <hta:application
-    id="codeexectest"
-    applicationname="codeexectest"
+    id="helloHTA"
+    applicationname="HelloMessage"
     border="thin"
     caption="yes"
     sysmenu="yes"
     scroll="no"
     singleinstance="yes"
   />
+
   <script language="JScript">
     window.onload = function() {
       try {
-        // Create a WScript.Shell object and show a native popup
+        // Native Windows popup via WScript.Shell
         var shell = new ActiveXObject("WScript.Shell");
-        // Popup(text, timeoutSeconds, title, typeFlags)
-        // typeFlags 0x40 = MB_ICONINFORMATION
-        shell.Popup("codeexectest", 0, "codeexectest", 0x40);
+        shell.Popup("Hello, World!", 0, "Greetings", 0x40);
       } catch (e) {
-        // Fallback to HTML alert if ActiveX isn't allowed
-        alert("codeexectest");
+        // Fallback to HTML alert if ActiveX is blocked
+        alert("Hello, World!");
       }
-      // Close the HTA window
       window.close();
     };
   </script>
 </head>
 <body>
-  <!-- No visible content needed -->
+  <!-- Nothing needed here -->
 </body>
 </html>
