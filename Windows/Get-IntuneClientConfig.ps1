@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    This PowerShell script extracts Intune configuration details from the Windows registry.
+    This PowerShell script extracts Intune and related configuration details from the Windows registry.
 .DESCRIPTION
     - Identifies the GUID dynamically from "C:\ProgramData\Microsoft\DMClient".
     - Uses the extracted GUID to locate the relevant registry path for Intune settings.
@@ -8,6 +8,7 @@
         1. HKLM:\SOFTWARE\Microsoft\PolicyManager\providers\{GUID}\default (Intune policies for the specific device)
         2. HKLM:\SOFTWARE\Microsoft\Policies\LAPS (Local Administrator Password Solution policies)
         3. HKLM:\SOFTWARE\Microsoft\PolicyManager\current (Current applied policies)
+        4. HKLM:\SOFTWARE\Microsoft\Policies\PassportForWork (Windows Hello for Business / Passport for Work policies)
     - Saves the exported registry configurations in "C:\Temp\RegistryDumps".
 .NOTES
     - This script must be run with administrative privileges.
@@ -31,7 +32,8 @@ Write-Host "Using GUID: $guid"
 $registryPaths = @(
     "HKLM:\SOFTWARE\Microsoft\PolicyManager\providers\$guid\default",
     "HKLM:\SOFTWARE\Microsoft\Policies\LAPS",
-    "HKLM:\SOFTWARE\Microsoft\PolicyManager\current"
+    "HKLM:\SOFTWARE\Microsoft\PolicyManager\current",
+    "HKLM:\SOFTWARE\Microsoft\Policies\PassportForWork"
 )
 
 # Output directory for text files
@@ -44,7 +46,7 @@ if (!(Test-Path $outputDir)) {
 foreach ($regPath in $registryPaths) {
     # Generate a filename by replacing "HKLM:\" with empty string and converting backslashes to underscores
     $fileName = $regPath -replace "^HKLM:\\", "" -replace "\\", "_"
-    $outputFile = "$outputDir\$fileName.txt"
+    $outputFile = Join-Path $outputDir "$fileName.txt"
     
     # Check if registry path exists before exporting
     if (Test-Path $regPath) {
