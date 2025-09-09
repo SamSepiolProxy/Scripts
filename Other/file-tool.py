@@ -21,25 +21,30 @@ def load_key(key_file="filekey.key"):
 
 
 def encrypt_file(filename, key):
-    """Encrypt a file using the given key."""
+    """Encrypt a file and save as <filename>_encrypted."""
     fernet = Fernet(key)
     with open(filename, "rb") as f:
         data = f.read()
     encrypted = fernet.encrypt(data)
-    with open(filename, "wb") as f:
+
+    encrypted_filename = f"{filename}_encrypted"
+    with open(encrypted_filename, "wb") as f:
         f.write(encrypted)
-    print(f"[+] File {filename} encrypted.")
+
+    print(f"[+] File {filename} encrypted -> {encrypted_filename}")
 
 
 def decrypt_file(filename, key):
-    """Decrypt a file using the given key."""
+    """Decrypt a file and overwrite the original file (same name)."""
     fernet = Fernet(key)
     with open(filename, "rb") as f:
         encrypted = f.read()
     decrypted = fernet.decrypt(encrypted)
+
     with open(filename, "wb") as f:
         f.write(decrypted)
-    print(f"[+] File {filename} decrypted.")
+
+    print(f"[+] File {filename} decrypted (overwritten in place).")
 
 
 def main():
@@ -56,7 +61,7 @@ def main():
     parser_enc.add_argument("-k", "--key-file", default="filekey.key", help="Path to key file (default: filekey.key)")
 
     # decrypt
-    parser_dec = subparsers.add_parser("decrypt", help="Decrypt a file")
+    parser_dec = subparsers.add_parser("decrypt", help="Decrypt a file (overwrites original)")
     parser_dec.add_argument("filename", help="File to decrypt")
     parser_dec.add_argument("-k", "--key-file", default="filekey.key", help="Path to key file (default: filekey.key)")
 
