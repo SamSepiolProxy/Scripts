@@ -1,13 +1,14 @@
-﻿# Function to check various SmartScreen-related registry entries and interpret their values
+# Function to check various SmartScreen-related registry entries and interpret their values
 function Get-SmartScreenStatus {
     $results = @()
 
-    # Define registry entries to check
+    # Define registry entries to check (HKLM + HKCU)
     $entries = @(
+        # --- HKLM entries ---
         @{
             "Registry Entry" = "HKLM:Software\Policies\Microsoft\Edge\SmartScreenEnabled"
             "Path" = "HKLM:\Software\Policies\Microsoft\Edge"
-            "Name" = "EdgeSmartScreenEnabled"
+            "Name" = "SmartScreenEnabled"
         },
         @{
             "Registry Entry" = "HKLM:Software\Policies\Microsoft\Windows\System\EnableSmartScreen"
@@ -33,21 +34,51 @@ function Get-SmartScreenStatus {
             "Registry Entry" = "HKLM:Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter\PreventOverrideAppRepUnknown"
             "Path" = "HKLM:\Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter"
             "Name" = "PreventOverrideAppRepUnknown"
+        },
+
+        # --- HKCU entries ---
+        @{
+            "Registry Entry" = "HKCU:Software\Microsoft\Edge\SmartScreenEnabled"
+            "Path" = "HKCU:\Software\Microsoft\Edge"
+            "Name" = "SmartScreenEnabled"
+        },
+        @{
+            "Registry Entry" = "HKCU:Software\Microsoft\Windows\CurrentVersion\AppHost\EnableWebContentEvaluation"
+            "Path" = "HKCU:\Software\Microsoft\Windows\CurrentVersion\AppHost"
+            "Name" = "EnableWebContentEvaluation"
+        },
+        @{
+            "Registry Entry" = "HKCU:Software\Microsoft\Windows\CurrentVersion\AppHost\SmartScreenEnabled"
+            "Path" = "HKCU:\Software\Microsoft\Windows\CurrentVersion\AppHost"
+            "Name" = "SmartScreenEnabled"
+        },
+        @{
+            "Registry Entry" = "HKCU:Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter\EnabledV9"
+            "Path" = "HKCU:\Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter"
+            "Name" = "EnabledV9"
+        },
+        @{
+            "Registry Entry" = "HKCU:Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter\PreventOverride"
+            "Path" = "HKCU:\Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter"
+            "Name" = "PreventOverride"
+        },
+        @{
+            "Registry Entry" = "HKCU:Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter\PreventOverrideAppRepUnknown"
+            "Path" = "HKCU:\Software\Policies\Microsoft\MicrosoftEdge\PhishingFilter"
+            "Name" = "PreventOverrideAppRepUnknown"
         }
     )
 
     # Query each registry entry and interpret the value
     foreach ($entry in $entries) {
         try {
-            # Attempt to get the registry value
             $value = Get-ItemPropertyValue -Path $entry.Path -Name $entry.Name -ErrorAction Stop
             
-            # Interpret the value
             $interpretedValue = switch ($entry.Name) {
-                "EdgeSmartScreenEnabled" {
+                "SmartScreenEnabled" {
                     switch ($value) {
-                        1 { "EdgeSmartScreenEnabled is enabled" }
-                        0 { "EdgeSmartScreenEnabled is disabled" }
+                        1 { "SmartScreen is enabled" }
+                        0 { "SmartScreen is disabled" }
                         default { "Not configured" }
                     }
                 }
@@ -64,6 +95,13 @@ function Get-SmartScreenStatus {
                         "Warn" { "SmartScreen warns the user" }
                         "Off" { "SmartScreen is turned off" }
                         default { "Not configured or unknown level" }
+                    }
+                }
+                "EnableWebContentEvaluation" {
+                    switch ($value) {
+                        1 { "SmartScreen web content evaluation is enabled" }
+                        0 { "SmartScreen web content evaluation is disabled" }
+                        default { "Not configured" }
                     }
                 }
                 "EnabledV9" {
@@ -90,7 +128,6 @@ function Get-SmartScreenStatus {
                 default { "Unknown setting" }
             }
         } catch {
-            # Handle missing registry keys or values
             $interpretedValue = "Registry entry or value does not exist"
         }
 
@@ -100,7 +137,14 @@ function Get-SmartScreenStatus {
         }
     }
 
-    # Return the results as a formatted table
+    # Output file path in current directory
+    $outputPath = Join-Path -Path (Get-Location) -ChildPath "SmartScreenStatus.txt"
+
+    # Write formatted output to text file
+    $results | Format-Table -AutoSize | Out-String | Set-Content -Path $outputPath -Encoding UTF8
+
+    # Display on screen
+    Write-Host "SmartScreen status written to: $outputPath`n" -ForegroundColor Cyan
     $results | Format-Table -AutoSize
 }
 
