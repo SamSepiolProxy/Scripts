@@ -39,12 +39,12 @@ function Get-SmartScreenStatus {
         # --- HKCU entries ---
         @{
             "Registry Entry" = "HKCU:Software\Microsoft\Edge\SmartScreenEnabled"
-            "Path" = "HKCU:\Software\Microsoft\Edge"
-            "Name" = ""  # unnamed default value
+            "Path" = "HKCU:\Software\Microsoft\Edge\SmartScreenEnabled"
+            "Name" = "(default)"  # unnamed default value
         },
         @{
             "Registry Entry" = "HKCU:Software\Microsoft\Edge\SmartScreenPUAEnabled"
-            "Path" = "HKCU:\Software\Microsoft\Edge"
+            "Path" = "HKCU:\Software\Microsoft\Edge\SmartScreenPUAEnabled"
             "Name" = ""  # unnamed default value
         },
         @{
