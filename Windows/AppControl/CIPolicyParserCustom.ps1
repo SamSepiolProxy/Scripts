@@ -1,45 +1,113 @@
-﻿# Ensure System.Security assembly is loaded.
-Add-Type -AssemblyName System.Security
-
-function ConvertTo-CIPolicy {
 <#
 .SYNOPSIS
-
-Converts a binary file that contains a Code Integrity policy into XML format.
-
-Author: Matthew Graeber (@mattifestation)
-Contributors: James Forshaw (@tiraniddo) - thanks for the major bug fixes!
-License: BSD 3-Clause
-
-Modified to add propert PKCS#7 support and the new DG policy header version.
+    CI Policy Parser - Converts binary Code Integrity policies to XML format.
 
 .DESCRIPTION
+    This PowerShell module provides functions to convert binary Windows Defender 
+    Application Control (WDAC) / Code Integrity policy files into human-readable 
+    XML format. Enhanced with folder batch processing capabilities.
 
-ConvertTo-CIPolicy converts a binary file that contains a Code Integrity policy into XML format. This function is used to audit deployed Code Integrity policies for which the original XML is not present. It can also be used to compare deployed rules against a reference XML file.
+.NOTES
+    Original Author: Matthew Graeber (@mattifestation)
+    Contributors: James Forshaw (@tiraniddo)
+    License: BSD 3-Clause
+    
+    Enhanced with folder support for batch processing of multiple policy files.
+    
+    Version: 2.0
+    Last Modified: 2024
 
-Note: the process of converting an XML file to a binary policy is lossy. ID, Name, and FriendlyName attributes are all lost in the process. ConvertTo-CIPolicy auto-generates ID and Name properties when necessary.
-
-ConvertTo-CIPolicy supports both signed and unsigned policies.
-
-.PARAMETER BinaryFilePath
-
-Specifies the path of the binary policy file that this cmdlet converts. Deployed binary policy files are located in %SystemRoot%\System32\CodeIntegrity\SIPolicy.p7b.
-
-.PARAMETER XmlFilePath
-
-Specifies the path for the output converted policy XML file.
+.FUNCTIONALITY
+    - Convert single binary CI policy files (.p7b, .bin, .cip) to XML
+    - Batch process entire folders of binary policies
+    - Recursive folder processing with structure preservation
+    - Extract signer certificates from signed policies
+    - Progress tracking and detailed status reporting
 
 .EXAMPLE
+    # Load the module
+    . .\CIPolicyParserCustom.ps1
 
-ConvertTo-CIPolicy -BinaryFilePath C:\Windows\System32\CodeIntegrity\SIPolicy.p7b -XmlFilePath recovered_policy.xml
+    # Convert single file
+    ConvertTo-CIPolicy -BinaryFilePath C:\Windows\System32\CodeIntegrity\SIPolicy.p7b -XmlFilePath policy.xml
 
-.OUTPUTS
+    # Convert all policies in a folder
+    ConvertTo-CIPolicy -FolderPath C:\Policies\Binary -XmlFilePath C:\Policies\XML
 
-System.IO.FileInfo
+    # Recursive folder processing
+    ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output -Recurse
 
-Outputs a recovered Code Integrity policy XML file.
+    # Process specific file types only
+    ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output -FileExtensions @('.p7b')
+
+    # Extract certificate from signed policy
+    Get-CIBinaryPolicyCertificate -BinaryFilePath C:\Windows\System32\CodeIntegrity\SIPolicy.p7b
+
+.LINK
+    https://github.com/mattifestation/WDACTools
+
+.COMPONENT
+    Windows Defender Application Control (WDAC)
+    Code Integrity Policy Management
 #>
 
+#region Script Information
+$Script:ModuleInfo = @{
+    Name = "CIPolicyParser"
+    Version = "2.0"
+    Author = "Matthew Graeber (@mattifestation)"
+    Contributors = "James Forshaw (@tiraniddo)"
+    License = "BSD 3-Clause"
+    Description = "Convert binary Code Integrity policies to XML with folder support"
+}
+#endregion
+
+#region Load Message
+Write-Host ""
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host "  CI Policy Parser v$($Script:ModuleInfo.Version)" -ForegroundColor White
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host "  Author: $($Script:ModuleInfo.Author)" -ForegroundColor Gray
+Write-Host "  Contributors: $($Script:ModuleInfo.Contributors)" -ForegroundColor Gray
+Write-Host "  License: $($Script:ModuleInfo.License)" -ForegroundColor Gray
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Available Functions:" -ForegroundColor Yellow
+Write-Host "    - ConvertTo-CIPolicy           : Convert binary CI policies to XML" -ForegroundColor White
+Write-Host "    - Get-CIBinaryPolicyCertificate: Extract certificates from signed policies" -ForegroundColor White
+Write-Host ""
+Write-Host "  New Features:" -ForegroundColor Yellow
+Write-Host "    - Folder batch processing      : -FolderPath parameter" -ForegroundColor Green
+Write-Host "    - Recursive processing         : -Recurse switch" -ForegroundColor Green
+Write-Host "    - Custom file extensions       : -FileExtensions parameter" -ForegroundColor Green
+Write-Host "    - Progress tracking & reporting" -ForegroundColor Green
+Write-Host ""
+Write-Host "  Quick Examples:" -ForegroundColor Yellow
+Write-Host '    # Single file conversion' -ForegroundColor Gray
+Write-Host '    ConvertTo-CIPolicy -BinaryFilePath .\policy.p7b -XmlFilePath .\policy.xml' -ForegroundColor DarkGray
+Write-Host ""
+Write-Host '    # Folder batch conversion' -ForegroundColor Gray
+Write-Host '    ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output' -ForegroundColor DarkGray
+Write-Host ""
+Write-Host '    # Recursive with specific extensions' -ForegroundColor Gray
+Write-Host '    ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output -Recurse -FileExtensions @(".p7b")' -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  For detailed help:" -ForegroundColor Yellow
+Write-Host '    Get-Help ConvertTo-CIPolicy -Full' -ForegroundColor DarkGray
+Write-Host '    Get-Help Get-CIBinaryPolicyCertificate -Full' -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host "  Module loaded successfully!" -ForegroundColor Green
+Write-Host "=====================================================================" -ForegroundColor Cyan
+Write-Host ""
+#endregion
+
+# Ensure System.Security assembly is loaded.
+Add-Type -AssemblyName System.Security
+
+#region Internal Functions
+# Internal function that processes a single binary file
+function ConvertTo-CIPolicySingleFile {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([System.IO.FileInfo])]
     param (
@@ -3323,7 +3391,195 @@ Outputs a recovered Code Integrity policy XML file.
         Get-Item -Path $FullXmlPath
     }
 }
+#endregion
 
+#region Public Functions
+# Main function with folder support
+function ConvertTo-CIPolicy {
+<#
+.SYNOPSIS
+
+Converts binary Code Integrity policy files into XML format. Supports single files or entire folders.
+
+Author: Matthew Graeber (@mattifestation)
+Contributors: James Forshaw (@tiraniddo)
+License: BSD 3-Clause
+
+Enhanced with folder support.
+
+.DESCRIPTION
+
+ConvertTo-CIPolicy converts binary Code Integrity policy files into XML format. This function is used to audit deployed Code Integrity policies for which the original XML is not present. It can process single files or entire folders of binary policies.
+
+.PARAMETER BinaryFilePath
+
+Specifies the path of the binary policy file to convert.
+
+.PARAMETER FolderPath
+
+Specifies a folder containing binary policy files to convert.
+
+.PARAMETER XmlFilePath
+
+For single file mode: path for the output XML file.
+For folder mode: directory where output XML files will be saved.
+
+.PARAMETER FileExtensions
+
+File extensions to process in folder mode. Default: @('.p7b', '.bin', '.cip')
+
+.PARAMETER Recurse
+
+Process subdirectories recursively in folder mode.
+
+.EXAMPLE
+
+ConvertTo-CIPolicy -BinaryFilePath C:\Windows\System32\CodeIntegrity\SIPolicy.p7b -XmlFilePath recovered_policy.xml
+
+Converts a single binary policy file.
+
+.EXAMPLE
+
+ConvertTo-CIPolicy -FolderPath C:\Policies\Binary -XmlFilePath C:\Policies\XML
+
+Converts all binary policy files in the folder.
+
+.EXAMPLE
+
+ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output -Recurse
+
+Recursively processes all policy files in subdirectories.
+
+.EXAMPLE
+
+ConvertTo-CIPolicy -FolderPath C:\Policies -XmlFilePath C:\Output -FileExtensions @('.p7b')
+
+Process only .p7b files.
+
+.OUTPUTS
+
+System.IO.FileInfo
+
+Outputs recovered Code Integrity policy XML file(s).
+#>
+
+    [CmdletBinding(SupportsShouldProcess, DefaultParameterSetName = 'SingleFile')]
+    [OutputType([System.IO.FileInfo])]
+    param (
+        [Parameter(Position = 0, Mandatory, ParameterSetName = 'SingleFile')]
+        [String]
+        [ValidateScript({ [IO.File]::Exists((Resolve-Path $_).Path) })]
+        $BinaryFilePath,
+
+        [Parameter(Position = 0, Mandatory, ParameterSetName = 'Folder')]
+        [String]
+        [ValidateScript({ [IO.Directory]::Exists((Resolve-Path $_).Path) })]
+        $FolderPath,
+
+        [Parameter(Position = 1, Mandatory)]
+        [String]
+        [ValidateNotNullOrEmpty()]
+        $XmlFilePath,
+
+        [Parameter(ParameterSetName = 'Folder')]
+        [String[]]
+        $FileExtensions = @('.p7b', '.bin', '.cip'),
+
+        [Parameter(ParameterSetName = 'Folder')]
+        [Switch]
+        $Recurse
+    )
+
+    if ($PSCmdlet.ParameterSetName -eq 'Folder') {
+        # Folder processing mode
+        $ResolvedFolderPath = (Resolve-Path $FolderPath).Path
+        
+        # Ensure output directory exists
+        if (-not [IO.Directory]::Exists($XmlFilePath)) {
+            if ($PSCmdlet.ShouldProcess($XmlFilePath, 'Create output directory')) {
+                New-Item -Path $XmlFilePath -ItemType Directory -Force | Out-Null
+            }
+        }
+        $OutputFolder = (Resolve-Path $XmlFilePath).Path
+
+        # Get all binary policy files
+        $GetChildItemParams = @{
+            Path = $ResolvedFolderPath
+            File = $true
+        }
+        if ($Recurse) {
+            $GetChildItemParams['Recurse'] = $true
+        }
+
+        $BinaryFiles = Get-ChildItem @GetChildItemParams | Where-Object {
+            $FileExtensions -contains $_.Extension.ToLower()
+        }
+
+        if ($BinaryFiles.Count -eq 0) {
+            Write-Warning "No binary policy files found in '$ResolvedFolderPath' with extensions: $($FileExtensions -join ', ')"
+            return
+        }
+
+        Write-Host "Found $($BinaryFiles.Count) binary policy file(s) to process" -ForegroundColor Cyan
+
+        $ProcessedFiles = @()
+        $FailedFiles = @()
+        $Counter = 0
+
+        foreach ($BinaryFile in $BinaryFiles) {
+            $Counter++
+            $PercentComplete = [math]::Round(($Counter / $BinaryFiles.Count) * 100)
+            Write-Progress -Activity "Converting CI Policy Files" -Status "Processing $Counter of $($BinaryFiles.Count)" -PercentComplete $PercentComplete -CurrentOperation $BinaryFile.Name
+
+            $OutputXmlName = [IO.Path]::GetFileNameWithoutExtension($BinaryFile.Name) + '.xml'
+            
+            # If recursing, maintain folder structure in output
+            if ($Recurse -and $BinaryFile.DirectoryName -ne $ResolvedFolderPath) {
+                $RelativePath = $BinaryFile.DirectoryName.Substring($ResolvedFolderPath.Length).TrimStart('\', '/')
+                $OutputSubFolder = Join-Path $OutputFolder $RelativePath
+                if (-not [IO.Directory]::Exists($OutputSubFolder)) {
+                    New-Item -Path $OutputSubFolder -ItemType Directory -Force | Out-Null
+                }
+                $OutputXmlPath = Join-Path $OutputSubFolder $OutputXmlName
+            } else {
+                $OutputXmlPath = Join-Path $OutputFolder $OutputXmlName
+            }
+
+            Write-Host "[$Counter/$($BinaryFiles.Count)] Processing: $($BinaryFile.Name)" -ForegroundColor Yellow
+            
+            try {
+                $Result = ConvertTo-CIPolicySingleFile -BinaryFilePath $BinaryFile.FullName -XmlFilePath $OutputXmlPath
+                if ($Result) {
+                    $ProcessedFiles += $Result
+                    Write-Host "  -> Success: $OutputXmlPath" -ForegroundColor Green
+                }
+            } catch {
+                $FailedFiles += @{
+                    File = $BinaryFile.FullName
+                    Error = $_.Exception.Message
+                }
+                Write-Warning "  -> Failed to process $($BinaryFile.FullName): $($_.Exception.Message)"
+            }
+        }
+
+        Write-Progress -Activity "Converting CI Policy Files" -Completed
+
+        Write-Host "`nProcessing complete:" -ForegroundColor Cyan
+        Write-Host "  Successfully converted: $($ProcessedFiles.Count) file(s)" -ForegroundColor Green
+        if ($FailedFiles.Count -gt 0) {
+            Write-Host "  Failed: $($FailedFiles.Count) file(s)" -ForegroundColor Red
+            foreach ($Failed in $FailedFiles) {
+                Write-Host "    - $($Failed.File): $($Failed.Error)" -ForegroundColor Red
+            }
+        }
+
+        return $ProcessedFiles
+    }
+    else {
+        # Single file mode - call the internal function
+        return ConvertTo-CIPolicySingleFile -BinaryFilePath $BinaryFilePath -XmlFilePath $XmlFilePath
+    }
+}
 function Get-CIBinaryPolicyCertificate {
 <#
 .SYNOPSIS
@@ -3372,3 +3628,4 @@ If the binary code integrity is signed, Get-CIBinaryPolicyCertificate will outpu
         throw "$BinPath is not a signed binary code integrity policy."
     }
 }
+#endregion
