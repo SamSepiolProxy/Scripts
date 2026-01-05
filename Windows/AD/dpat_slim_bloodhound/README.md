@@ -159,7 +159,7 @@ This is sourced from the following Cypher query (as requested):
 ```
 MATCH (n:Base)
 WHERE ((n:Tag_Tier_Zero) OR COALESCE(n.system_tags, '') CONTAINS 'admin_tier_0')
-AND n.enabled = true "
+AND n.enabled = true
 RETURN n
 ```
 
