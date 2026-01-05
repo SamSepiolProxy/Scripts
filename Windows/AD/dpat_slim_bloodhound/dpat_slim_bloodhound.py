@@ -121,7 +121,7 @@ def _safe_bool(v) -> Optional[bool]:
     return None
 
 
-def fetch_bh_user_metadata(cfg: Config) -> Tuple[Dict[str, BHNodeMeta], Dict[str, int]]:
+def fetch_bh_user_metadata(cfg: Config) -> Tuple[Dict[str, BHNodeMeta], Dict[str, int], List[BHNodeMeta]]:
     """Fetch BloodHound CE metadata and build a lookup index.
 
     This performs two read-only cypher queries:
@@ -206,10 +206,28 @@ def fetch_bh_user_metadata(cfg: Config) -> Tuple[Dict[str, BHNodeMeta], Dict[str
 
     # Query (2): all users (for enabled coverage)
     users_resp = client.run_cypher("MATCH (u:User) RETURN u", include_properties=True)
+
+    # Query (3): enabled kerberoastable users (User nodes with SPNs)
+    kerb_query = (
+        "MATCH (u:User) "
+        "WHERE u.hasspn=true "
+        "AND u.enabled = true "
+        "AND NOT u.objectid ENDS WITH '-502' "
+        "AND NOT COALESCE(u.gmsa, false) = true "
+        "AND NOT COALESCE(u.msa, false) = true "
+        "RETURN u"
+    )
+    kerb_resp = client.run_cypher(kerb_query, include_properties=True)
+    kerb_data = (kerb_resp.get("data") or {})
+    kerb_nodes = (kerb_data.get("nodes") or {})
+
     users_data = (users_resp.get("data") or {})
     users_nodes = (users_data.get("nodes") or {})
 
     meta_by_key: Dict[str, BHNodeMeta] = {}
+
+    kerberoastable_enabled: List[BHNodeMeta] = []
+
     total_nodes = 0
     total_users = 0
     total_tier0_enabled = len(tier0_nodes)
@@ -287,13 +305,47 @@ def fetch_bh_user_metadata(cfg: Config) -> Tuple[Dict[str, BHNodeMeta], Dict[str
         )
         _index(meta)
 
+    # Collect kerberoastable enabled users (for reporting table)
+    for _, node in kerb_nodes.items():
+        if not isinstance(node, dict):
+            continue
+        kind = node.get("kind")
+        if kind and str(kind).lower() != "user":
+            continue
+
+        meta = _node_to_meta(node, default_tier0=None)
+
+        # Derive tier zero using tier0 objectids/keys collected earlier
+        tz = meta.tier_zero
+        if tz is None:
+            if meta.objectid and meta.objectid in tier0_objectids:
+                tz = True
+            elif meta.samaccountname and meta.samaccountname.lower() in tier0_keys:
+                tz = True
+            elif meta.name and meta.name.lower() in tier0_keys:
+                tz = True
+
+        meta = BHNodeMeta(
+            name=meta.name,
+            samaccountname=meta.samaccountname,
+            enabled=True if meta.enabled is None else meta.enabled,
+            tier_zero=tz,
+            objectid=meta.objectid,
+            kind=meta.kind or "User",
+        )
+
+        kerberoastable_enabled.append(meta)
+
+
+
     stats = {
         "bh_total_nodes": total_nodes,
         "bh_total_users": total_users,
         "bh_total_tier0_enabled": total_tier0_enabled,
         "bh_index_keys": len(meta_by_key),
+        "bh_total_kerberoastable_enabled": len(kerberoastable_enabled),
     }
-    return meta_by_key, stats
+    return meta_by_key, stats, kerberoastable_enabled
 
 
 # --------------------------- Config ---------------------------
@@ -821,12 +873,13 @@ def build_report(cfg: Config, db: DB) -> Path:
     # Optional BloodHound CE enrichment (enabled/tier zero)
     bh_meta: Optional[Dict[str, BHNodeMeta]] = None
     bh_stats: Dict[str, int] = {}
+    bh_kerb: List[BHNodeMeta] = []
     if cfg.bh_url or cfg.bh_username or cfg.bh_password:
         if not (cfg.bh_url and cfg.bh_username and cfg.bh_password):
             logger.warning("BloodHound enrichment requested but --bh-url/--bh-user/--bh-pass are not all set; skipping.")
         else:
             try:
-                bh_meta, bh_stats = fetch_bh_user_metadata(cfg)
+                bh_meta, bh_stats, bh_kerb = fetch_bh_user_metadata(cfg)
                 logger.info("BloodHound enrichment loaded: %s users, %s tier0-enabled objects, %s index keys", bh_stats.get("bh_total_users"), bh_stats.get("bh_total_tier0_enabled"), bh_stats.get("bh_index_keys"))
             except Exception as e:
                 logger.warning("Failed to load BloodHound enrichment; continuing without it. Error: %s", e)
@@ -1196,6 +1249,71 @@ def build_report(cfg: Config, db: DB) -> Path:
             )
         else:
             r.add("<p class='text-left'><strong>BloodHound Tier Zero (Matched)</strong>: No Tier Zero matched objects were identified.</p>")
+
+
+        # Enabled kerberoastable users (BloodHound)
+        if bh_kerb:
+            # Build a lookup index for accounts so we can annotate cracked status
+            db.cur.execute("SELECT username_full, username, password, nt_hash FROM accounts")
+            acct_rows = db.cur.fetchall()
+            acct_by_key: Dict[str, Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]] = {}
+
+            def _acct_index(username_full: Optional[str], username: Optional[str], password: Optional[str], nt_hash: Optional[str]) -> None:
+                keys = set()
+                if username:
+                    keys.add(username.lower())
+                if username_full:
+                    ufl = username_full.lower()
+                    keys.add(ufl)
+                    if "\\" in ufl:
+                        dom, u = ufl.split("\\", 1)
+                        keys.add(u)
+                        keys.add(f"{u}@{dom}")
+                for k in keys:
+                    acct_by_key.setdefault(k, (username_full, username, password, nt_hash))
+
+            for ufull, uname, pw, nth in acct_rows:
+                _acct_index(ufull, uname, pw, nth)
+
+            def _acct_lookup(meta: BHNodeMeta) -> Optional[Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]]:
+                keys = set()
+                if meta.samaccountname:
+                    keys.add(meta.samaccountname.lower())
+                if meta.name:
+                    nl = meta.name.lower()
+                    keys.add(nl)
+                    if "@" in nl:
+                        keys.add(nl.split("@", 1)[0])
+                for k in keys:
+                    if k in acct_by_key:
+                        return acct_by_key[k]
+                return None
+
+            kerb_rows = []
+            for meta in sorted(bh_kerb, key=lambda m: ((m.samaccountname or m.name or "").lower())):
+                acct = _acct_lookup(meta)
+                password = acct[2] if acct else None
+                nt_hash = acct[3] if acct else None
+                cracked_str = "Yes" if (password is not None) else "No"
+                plen = len(password) if password else 0
+                tz_str = "Unknown"
+                if meta.tier_zero is True:
+                    tz_str = "Yes"
+                elif meta.tier_zero is False:
+                    tz_str = "No"
+
+                display_user = meta.samaccountname or meta.name or ""
+                row = (display_user, cracked_str, password or "", plen, nt_hash or "", tz_str, meta.objectid or "")
+                row = sanitizer.sanitize_row(row, [2], [4], cfg.sanitize_output)
+                kerb_rows.append(row)
+
+            add_table_and_export(
+                kerb_rows[:2000],
+                ["Username", "Cracked", "Password", "Password Length", "NT Hash", "Tier Zero (BH)", "ObjectId (BH)"],
+                caption="All Enabled Kerberoastable Users (BloodHound)",
+            )
+        else:
+            r.add("<p class='text-left'><strong>All Enabled Kerberoastable Users (BloodHound)</strong>: None identified (or BloodHound enrichment not enabled).</p>")
 
         # Cracked & enabled (matched)
         if cracked_enabled:
