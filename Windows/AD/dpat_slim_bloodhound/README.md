@@ -3,6 +3,12 @@
 A slimmed-down **Domain Password Audit Tool (DPAT)** workflow that ingests an **NTDS extract** (e.g., `secretsdump`-style output) and a **Hashcat potfile** (`hash:password`) and produces an **interactive HTML report** (plus CSV exports of the report tables).  
 Optionally, it can enrich results via **BloodHound CE** (read-only API queries).
 
+## Attribution
+
+This project is based on the original **DPAT** by `clr2of8`:
+
+- Repository: https://github.com/clr2of8/DPAT
+
 ## What this tool does
 
 - Parses an NTDS dump in `DOMAIN\user:RID:LMHASH:NTHASH:...` format.
