@@ -6,7 +6,7 @@ param(
     [string]$Resource = "https://graph.microsoft.com",
     
     [Parameter(Mandatory=$false)]
-    [string]$RedirectUri = "urn:ietf:wg:oauth:2.0:oob",
+    [string]$RedirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient",
     
     [Parameter(Mandatory=$false)]
     [string]$Scope = "openid profile offline_access",
